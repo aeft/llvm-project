@@ -250,7 +250,7 @@ private:
   ///   - `0`: disable field tracking (records become single-origin).
   ///   - `N > 0`: track up to N levels of field edges.
   /// Pointee edges are not subject to this limit.
-  std::optional<size_t> MaxFieldDepth = std::optional<size_t>(0);
+  std::optional<size_t> MaxFieldDepth = std::optional<size_t>(1);
 };
 } // namespace clang::lifetimes::internal
 
