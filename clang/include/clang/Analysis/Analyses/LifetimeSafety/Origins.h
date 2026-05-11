@@ -194,7 +194,7 @@ public:
 
   unsigned getNumOrigins() const { return NextOriginID.Value; }
 
-  bool hasOrigins(QualType QT) const;
+  bool hasOrigins(QualType QT, unsigned FieldDepth = 0) const;
   bool hasOrigins(const Expr *E) const;
 
   void dump(OriginID OID, llvm::raw_ostream &OS) const;

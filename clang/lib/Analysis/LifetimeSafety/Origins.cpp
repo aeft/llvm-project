@@ -100,7 +100,7 @@ private:
 
 } // namespace
 
-bool OriginManager::hasOrigins(QualType QT) const {
+bool OriginManager::hasOrigins(QualType QT, unsigned FieldDepth) const {
   if (QT->isPointerOrReferenceType() || isGslPointerType(QT))
     return true;
   if (LifetimeAnnotatedOriginTypes.contains(QT.getCanonicalType().getTypePtr()))
@@ -118,11 +118,14 @@ bool OriginManager::hasOrigins(QualType QT) const {
   if (It != HasOriginsCache.end())
     return It->second;
 
+  if (MaxFieldDepth && FieldDepth >= *MaxFieldDepth)
+    return HasOriginsCache[Key] = false;
+
   // A lambda has origins when any capture has a tracked type; the lambda
   // itself is tracked as a single origin.
   if (RD->isLambda()) {
     for (const auto *FD : RD->fields())
-      if (hasOrigins(FD->getType()))
+      if (hasOrigins(FD->getType(), FieldDepth + 1))
         return HasOriginsCache[Key] = true;
     return HasOriginsCache[Key] = false;
   }
@@ -130,7 +133,8 @@ bool OriginManager::hasOrigins(QualType QT) const {
   if (RD->isUnion())
     return HasOriginsCache[Key] = false;
   for (const auto *FD : RD->fields())
-    if (isTrackedField(RD, FD))
+    if (FD->getAccess() == AS_public &&
+        hasOrigins(FD->getType(), FieldDepth + 1))
       return HasOriginsCache[Key] = true;
   return HasOriginsCache[Key] = false;
 }
