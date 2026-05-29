@@ -2999,8 +2999,7 @@ void clang::sema::AnalysisBasedWarnings::IssueWarnings(
     }
   }
 
-  if (S.getLangOpts().CPlusPlus &&
-      S.getLangOpts().EnableLifetimeSafetyTUAnalysis)
+  if (S.getLangOpts().CPlusPlus)
     LifetimeSafetyTUAnalysis(S, TU, LSStats);
 }
 
