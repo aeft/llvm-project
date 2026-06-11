@@ -116,6 +116,16 @@ public:
 
   llvm::ArrayRef<Edge> children() const { return Children; }
 
+  template <typename Fn> void forEachOrigin(Fn F) const {
+    llvm::SmallVector<const OriginNode *, 4> Worklist{this};
+    for (size_t I = 0; I < Worklist.size(); ++I) {
+      const OriginNode *N = Worklist[I];
+      F(N);
+      for (const Edge &E : N->children())
+        Worklist.push_back(E.Child);
+    }
+  }
+
   OriginNode *getPointeeChild() const {
     for (const Edge &E : Children)
       if (!E.FD)

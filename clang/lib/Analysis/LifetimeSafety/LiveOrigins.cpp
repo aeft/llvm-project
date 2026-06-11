@@ -131,26 +131,22 @@ public:
   /// Walks the full subtree so loans held by any descendant (pointee
   /// chain or field child) become visible at the use site.
   Lattice transfer(Lattice In, const UseFact &UF) {
-    return transferUseSubtree(In, UF, UF.getUsedOrigins());
-  }
-
-  Lattice transferUseSubtree(Lattice In, const UseFact &UF,
-                             const OriginNode *Cur) {
-    if (!Cur)
+    const OriginNode *Root = UF.getUsedOrigins();
+    if (!Root)
       return In;
-    OriginID OID = Cur->getOriginID();
     Lattice Out = In;
-    // Write kills liveness.
-    if (UF.isWritten()) {
-      Out = Lattice(Factory.remove(Out.LiveOrigins, OID));
-    } else {
-      // Read makes origin live with definite confidence (dominates this
-      // point).
-      Out = Lattice(Factory.add(Out.LiveOrigins, OID,
-                                LivenessInfo(&UF, LivenessKind::Must)));
-    }
-    for (const OriginNode::Edge &E : Cur->children())
-      Out = transferUseSubtree(Out, UF, E.Child);
+    Root->forEachOrigin([this, &UF, &Out](const OriginNode *Cur) {
+      OriginID OID = Cur->getOriginID();
+      // Write kills liveness.
+      if (UF.isWritten()) {
+        Out = Lattice(Factory.remove(Out.LiveOrigins, OID));
+      } else {
+        // Read makes origin live with definite confidence (dominates this
+        // point).
+        Out = Lattice(Factory.add(Out.LiveOrigins, OID,
+                                  LivenessInfo(&UF, LivenessKind::Must)));
+      }
+    });
     return Out;
   }
 

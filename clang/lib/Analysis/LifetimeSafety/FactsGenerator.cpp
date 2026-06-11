@@ -69,20 +69,25 @@ bool FactsGenerator::hasOrigins(const Expr *E) const {
 void FactsGenerator::flow(OriginNode *Dst, OriginNode *Src, bool Kill) {
   if (!Dst)
     return;
-  assert(Src &&
-         "Dst is non-null but Src is null. List must have the same length");
-  assert(Dst->getLength() == Src->getLength() &&
-         "Pointee chains must have the same length");
 
-  while (Dst && Src) {
-    CurrentBlockFacts.push_back(FactMgr.createFact<OriginFlowFact>(
-        Dst->getOriginID(), Src->getOriginID(), Kill));
-    for (const OriginNode::Edge &E : Dst->children())
-      if (E.FD)
-        if (OriginNode *SrcF = Src->getFieldChild(E.FD))
-          flow(E.Child, SrcF, Kill);
-    Dst = Dst->getPointeeChild();
-    Src = Src->getPointeeChild();
+  assert(Src && "Dst node has no paired Src node");
+
+  llvm::SmallVector<std::pair<OriginNode *, OriginNode *>, 4> Worklist{
+      {Dst, Src}};
+  for (size_t I = 0; I < Worklist.size(); ++I) {
+    auto [D, S] = Worklist[I];
+    assert(D->getLength() == S->getLength() &&
+           "matched Dst/Src nodes must have equal pointee-chain length");
+    while (D && S) {
+      CurrentBlockFacts.push_back(FactMgr.createFact<OriginFlowFact>(
+          D->getOriginID(), S->getOriginID(), Kill));
+      for (const OriginNode::Edge &E : D->children())
+        if (E.FD)
+          if (OriginNode *SrcF = S->getFieldChild(E.FD))
+            Worklist.push_back({E.Child, SrcF});
+      D = D->getPointeeChild();
+      S = S->getPointeeChild();
+    }
   }
 }
 
@@ -403,18 +408,17 @@ void FactsGenerator::VisitUnaryOperator(const UnaryOperator *UO) {
   }
 }
 
-void FactsGenerator::emitReturnEscapes(OriginNode *N, const Expr *RetExpr) {
-  if (!N)
-    return;
-  EscapesInCurrentBlock.push_back(
-      FactMgr.createFact<ReturnEscapeFact>(N->getOriginID(), RetExpr));
-  for (const OriginNode::Edge &E : N->children())
-    emitReturnEscapes(E.Child, RetExpr);
-}
-
 void FactsGenerator::VisitReturnStmt(const ReturnStmt *RS) {
-  if (const Expr *RetExpr = RS->getRetValue())
-    emitReturnEscapes(getOriginNode(*RetExpr), RetExpr);
+  const Expr *RetExpr = RS->getRetValue();
+  if (!RetExpr)
+    return;
+  OriginNode *Root = getOriginNode(*RetExpr);
+  if (!Root)
+    return;
+  Root->forEachOrigin([this, RetExpr](const OriginNode *Cur) {
+    EscapesInCurrentBlock.push_back(
+        FactMgr.createFact<ReturnEscapeFact>(Cur->getOriginID(), RetExpr));
+  });
 }
 
 void FactsGenerator::handleAssignment(const Expr *TargetExpr,
